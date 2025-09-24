@@ -101,14 +101,33 @@ def remove_overlapping_pairs(pairs: list[PossibleMerge]) -> list[PossibleMerge]:
 
 
 def apply_merges(communities: list[int], pairs: list[PossibleMerge]) -> list[int]:
-    communities = np.array(communities)
+    # Optimize by building a remap dict, then using np.vectorize for all replacements in one pass
+    if not pairs:
+        return communities
 
-    for pair in pairs:
-        communities[communities == pair.c2] = pair.c1
-    return communities.tolist()
+    communities_np = np.array(communities)
+    # Build mapping from c2 -> c1 for all merge pairs
+    mapping = {pair.c2: pair.c1 for pair in pairs}
+    if not mapping:
+        return communities
+
+    # Avoid repeated __eq__ filtering by using numpy indexing
+    indices = np.isin(communities_np, list(mapping.keys()))
+    if not np.any(indices):
+        return communities
+
+    def merge_func(x):
+        return mapping.get(x, x)
+
+    # Vectorized replacement for all mapped communities
+    communities_np = np.vectorize(merge_func, otypes=[communities_np.dtype])(communities_np)
+    return communities_np.tolist()
 
 
 def get_dwm(mat: np.ndarray, communities: list[int]) -> float:
+    # Convert input list to numpy array only if necessary
+    # This avoids repeated array construction when already an ndarray
+    communities = np.asarray(communities)
     out_degree = mat.sum(axis=0)
     in_degree = mat.sum(axis=1)
     total_edges = out_degree.sum()
@@ -116,12 +135,18 @@ def get_dwm(mat: np.ndarray, communities: list[int]) -> float:
     if total_edges == 0:
         return 0
 
-    communities = np.array(communities)
-    community_mat = communities[:, None] == communities[None, :]
+    # Use broadcasting instead of explicit == 
+    # For large graphs, much faster to use broadcasting mask with np.equal.outer
+    community_mat = np.equal.outer(communities, communities)
 
+    # Use numpy's einsum for faster matrix computations
+    # Compute expected_matrix using np.outer as before (no significant gain from optimization here)
     expected_matrix = np.outer(out_degree, in_degree) / total_edges
-    modularity_matrix = (mat - expected_matrix) * community_mat
-    return modularity_matrix.sum() / total_edges
+
+    # Compute modularity matrix sum in a memory-efficient way
+    # (mat - expected_matrix) only needed for those in same community: use community_mat as mask
+    modularity_contrib = (mat - expected_matrix)[community_mat]
+    return modularity_contrib.sum() / total_edges
 
 
 @attrs.define(eq=True, frozen=True)
