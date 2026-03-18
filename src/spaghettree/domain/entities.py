@@ -170,15 +170,16 @@ class ImportCST:
     as_name: str = attrs.field(validator=[instance_of(str)])
 
     def to_str(self) -> str:
-        output: list[str] = []
         if self.import_type is ImportType.FROM:
-            output.append(f"from {self.module} import {self.name}")
+            base = "from " + self.module + " import " + self.name
         elif self.import_type is ImportType.IMPORT:
-            output.append(f"import {self.module}")
+            base = "import " + self.module
+        else:
+            base = ""
 
         if self.name != self.as_name:
-            output.append(f"as {self.as_name}")
-        return " ".join(output) + "\n"
+            return base + " as " + self.as_name + "\n"
+        return base + "\n"
 
 
 def resolve_calls(
