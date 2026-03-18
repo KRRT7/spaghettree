@@ -63,12 +63,17 @@ class ClassCST:
         return self
 
     def resolve_native_imports(self) -> Self:
+        # Track existing import keys to avoid creating duplicate ImportCST instances.
+        existing_keys = {(imp.module, imp.import_type, imp.name, imp.as_name) for imp in self.imports}
+
         for method in self.methods:
             for call in method.calls:
-                call_parts = call.split(".")
-                mod_name = ".".join(call_parts[:-1])
-                call_name = call_parts[-1]
-                self.imports.add(ImportCST(mod_name, ImportType.FROM, call_name, call_name))
+                # Use rpartition to avoid list allocation from split and expensive join operations.
+                mod_name, sep, call_name = call.rpartition(".")
+                key = (mod_name.lower(), ImportType.FROM, call_name, call_name)
+                if key not in existing_keys:
+                    existing_keys.add(key)
+                    self.imports.add(ImportCST(mod_name, ImportType.FROM, call_name, call_name))
         return self
 
     def add_referenced_imports(self, imports: set[ImportCST]) -> Self:
