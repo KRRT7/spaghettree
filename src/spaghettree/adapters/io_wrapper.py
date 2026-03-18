@@ -64,13 +64,14 @@ class IOBase(ABC):
                 continue
             res = self.read(path)
             if res.is_ok():
-                if f"/{self.src_dirname}/" in path:
-                    self.src_files[path] = res.inner
-                elif f"/{self.tests_dirname}/" in path and (
+                is_test = f"/{self.tests_dirname}/" in path and (
                     Path(path).stem.startswith("test_")
                     or Path(path).stem in ["__init__", "conftest"]
-                ):
+                )
+                if is_test:
                     self.test_files[path] = res.inner
+                else:
+                    self.src_files[path] = res.inner
             else:
                 fails[path] = res
 

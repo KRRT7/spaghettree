@@ -35,6 +35,7 @@ class OnePassVisitor(MetadataBase):
     entities: dict = attrs.field(factory=dict)
     locations: dict = attrs.field(factory=dict)
     imports: set[ImportCST] = attrs.field(factory=set)
+    _func_scope_pushed: list[bool] = attrs.field(factory=list)
 
     def __attrs_post_init__(self) -> None:
         self.scope.append(self.module_name)
@@ -79,7 +80,7 @@ class OnePassVisitor(MetadataBase):
         self.imports.add(ImportCST(key, import_type, name, as_name))
 
     def visit_Assign(self, node: cst.Assign) -> None:  # noqa: N802
-        if not self.is_toplevel:
+        if not self.is_toplevel or self.in_func or self.in_cls:
             return
         for target in node.targets:
             if not isinstance(target.target, cst.Name) or target.target.value == "__all__":
@@ -90,7 +91,7 @@ class OnePassVisitor(MetadataBase):
         self._leave_global()
 
     def visit_AnnAssign(self, node: cst.AnnAssign) -> None:  # noqa: N802
-        if self.is_toplevel and isinstance(node.target, cst.Name):
+        if self.is_toplevel and not self.in_func and not self.in_cls and isinstance(node.target, cst.Name):
             self._record_global(node.target.value, node)
 
     def leave_AnnAssign(self, _: cst.AnnAssign) -> None:  # noqa: N802
@@ -123,21 +124,26 @@ class OnePassVisitor(MetadataBase):
             self.in_cls = False
 
     def visit_FunctionDef(self, node: cst.FunctionDef) -> None:  # noqa: N802
-        if self.is_toplevel or self.in_cls:
+        was_in_func = self.in_func
+        is_direct_method = self.in_cls and not was_in_func
+
+        pushed = self.is_toplevel or is_direct_method
+        self._func_scope_pushed.append(pushed)
+        if pushed:
             self.scope.append(node.name.value)
             self.in_func = True
 
         scope = self._get_current_scope()
         func_cst = FuncCST(scope, node)
 
-        if self.in_cls:
+        if is_direct_method:
             self.entities[self._get_current_class_scope()].methods.append(func_cst)
         elif self.is_toplevel:
             self._record_location(node, node.name.value)
             self.entities[scope] = func_cst
 
     def leave_FunctionDef(self, _: cst.FunctionDef) -> None:  # noqa: N802
-        if self.is_toplevel or self.in_cls:
+        if self._func_scope_pushed.pop():
             self.scope.pop()
             self.in_func = False
 
