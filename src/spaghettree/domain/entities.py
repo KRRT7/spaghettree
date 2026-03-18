@@ -72,10 +72,14 @@ class ClassCST:
         return self
 
     def add_referenced_imports(self, imports: set[ImportCST]) -> Self:
+        # Collect all calls across methods once for fast membership checks
+        all_calls: set[str] = set()
+        for meth in self.methods:
+            all_calls.update(meth.calls)
+
         for imp in imports:
-            for meth in self.methods:
-                if imp.as_name in meth.calls or f"{imp.module}.{imp.as_name}" in meth.calls:
-                    self.imports.add(imp)
+            if imp.as_name in all_calls or f"{imp.module}.{imp.as_name}" in all_calls:
+                self.imports.add(imp)
         return self
 
 
