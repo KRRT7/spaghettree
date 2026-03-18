@@ -44,11 +44,10 @@ def run_process(
     logger.info(f"*** RUNNING `spaghettree` {src_root = } {new_root = } ***")
     src_code = io.read_files(src_root).unwrap()
 
-    ent_and_locs_res = extract_entities_and_locations(src_code)
-    entities, location_map = ent_and_locs_res.unwrap()
-    entities_res = filter_non_native_calls(entities)
-    entities = entities_res.unwrap()
-    call_tree = entities_res.and_then(create_call_tree).unwrap()
+    # Extract entities and locations, then filter and build call tree.
+    entities, location_map = extract_entities_and_locations(src_code).unwrap()
+    entities = filter_non_native_calls(entities).unwrap()
+    call_tree = create_call_tree(entities).unwrap()
 
     if optimise_src_code:
         res = optimise_entity_positions(
