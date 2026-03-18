@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "attrs>=25.4.0",
     "black>=25.1.0",
+    "codeflash",
     "danom>=0.1.0",
     "isort>=6.0.1",
     "libcst>=1.6.0",
@@ -43,7 +44,7 @@ research = [
     "fastapi==0.115.12",
     "manimgl==1.7.2",
     "pydantic==2.11.3",
-    "pytest==8.3.4",
+    "pytest==8.3.5",
     "pre-commit==4.1.0",
     "poetry==2.1.2",
     "prophet==1.1.6",
@@ -77,3 +78,13 @@ addopts = [
     "--cov-fail-under=80",
 ]
 testpaths = ["tests"]
+
+[tool.codeflash]
+# All paths are relative to this pyproject.toml's directory.
+module-root = "src"
+tests-root = "tests"
+ignore-paths = []
+formatter-cmds = ["disabled"]
+
+[tool.uv.sources]
+codeflash = { path = "../cf_org/codeflash", editable = true }
